@@ -1,0 +1,10 @@
+const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const sharp=require(process.env.CPA_SHARP_PATH||'sharp');
+const app=fs.readFileSync('docs/app.js','utf8');
+const ctx=vm.createContext({console,Math});
+for(const name of ['control-core','fiber-model','field-model'])vm.runInContext(fs.readFileSync('docs/'+name+'.js','utf8'),ctx);
+vm.runInContext(app.slice(0,app.indexOf("\n$$('[data-mode]').forEach")),ctx);
+for(const name of ['model-ui','optics'])vm.runInContext(fs.readFileSync('docs/'+name+'.js','utf8'),ctx);
+const ids=vm.runInContext("['overview',...components.map(c=>c.id)]",ctx);
+fs.mkdirSync('.sites-runtime/qa',{recursive:true});
+(async()=>{for(const id of ids){let svg=vm.runInContext(id==='overview'?'overview()':`focusDiagram('${id}')`,ctx);svg=svg.replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" ').replace('><defs>', '><style>text{font-family:Microsoft YaHei,sans-serif}.hit{fill:none;stroke:none}.control-line{stroke-dasharray:6 5}.block-indicator{stroke-dasharray:4 4}.overview-compressor text{display:none}</style><rect width="100%" height="100%" fill="#13292f"/><defs>');fs.writeFileSync('.sites-runtime/qa/'+id+'.svg',svg);await sharp(Buffer.from(svg)).png().toFile('.sites-runtime/qa/'+id+'.png');}console.log('Rendered '+ids.length+' source diagrams.');})();

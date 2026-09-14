@@ -1,0 +1,27 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ctx=vm.createContext({console,Math});vm.runInContext(fs.readFileSync('docs/control-core.js','utf8'),ctx);const run=s=>vm.runInContext(s,ctx);
+const close=(a,b,t=1e-8)=>assert(Math.abs(a-b)<t,`${a} differs from ${b}`);
+close(run('aomEfficiency(0)'),0);close(run('aomEfficiency(1)'),.9);close(run('aomEfficiency(.5)'),.45);
+let previous=-1;for(let i=0;i<=100;i++){const e=run(`aomEfficiency(${i/100})`);assert(e>=previous-1e-12&&e>=0&&e<=.9);previous=e;}
+assert(run('aomEfficiency(.51)-aomEfficiency(.49)')>50*run('aomEfficiency(.02)-aomEfficiency(0)'));
+const pid=(gains=[.5,1,.015],seconds=40)=>run(`{const s={target:8,powerLock:true,kp:${gains[0]},ki:${gains[1]},kd:${gains[2]},aomV:0,aomT:0,integral:0,pidPrevious:0,pidDerivative:0,manualVoltage:0};const y=[];for(let i=0;i<${seconds*100};i++){pidAdvance(s,13.3875,.01);if(i>${(seconds-5)*100})y.push(s.aomT*13.3875);}({state:s,power:y.at(-1),span:Math.max(...y)-Math.min(...y)})}`);
+const stable=pid();close(stable.power,8,.001);assert(stable.span<.001);
+assert(pid([.02,.005,0]).power<1,'tiny gains must be visibly slow');
+for(const gains of [[25,1,.015],[.5,60,.015],[.5,1,8]])assert(pid(gains).span>5,'each excessive gain can destabilize the delayed plant');
+run(`var s=${JSON.stringify(stable.state)};var history=[];`);run('for(let i=0;i<3000;i++)pidAdvance(s,13.3875*.8,.01)');close(run('s.aomT*13.3875*.8'),8,.01);
+run('for(let i=0;i<3000;i++)pidAdvance(s,2,.01)');close(run('s.aomT'),.9,.001);assert(run('s.aomV')<=1);
+run('for(let i=0;i<4000;i++)pidAdvance(s,13.3875,.01)');close(run('s.aomT*13.3875'),8,.01);
+run('s.powerLock=false;s.manualVoltage=.4;for(let i=0;i<1000;i++)pidAdvance(s,13.3875,.01)');close(run('s.aomV'),.4);close(run('s.aomT'),run('aomEfficiency(.4)'));
+for(const x of [0,7,12,16,20])close(run(`compressorSample(${x},300).signal*compressorSample(${x},300).tau`),300);
+const sampled=run(`{const calls=[];const result=pd5GradientStep(8,x=>{calls.push(x);return 1/(1+(x-7)**2);},1,.1,1);({calls,result})}`);
+assert.deepEqual([...sampled.calls],[7.95,8.05]);assert(sampled.result.position<8,'gradient must come from supplied PD5 sensor');
+const gd=(target,eta,h,start=16)=>run(`{let x=${start},positions=[];for(let i=0;i<300;i++){x=pd5GradientStep(x,p=>compressorSample(p,300).signal,300/${target},${eta},${h}).position;if(i>250)positions.push(x);}({x,tau:compressorSample(x,300).tau,span:Math.max(...positions)-Math.min(...positions)})}`);
+for(const target of [300,450,900])close(gd(target,2,1).tau,target,1);
+for(const [eta,h]of [[.0001,1],[2,.0001]])assert(gd(300,eta,h).tau>640,'small learning rate or motor step remains slow');
+for(const [eta,h]of [[30,1],[2,10]])assert(gd(300,eta,h).span>15,'large learning rate or motor step oscillates between bounds');
+assert(!run('compressionReachable(300,250)'));assert(!run('compressionReachable(300,1900)'));assert(run('compressionReachable(300,450)'));
+const seed=run('gaussianOutput(300,300)'),cfbg=run('gaussianOutput(300,150000)');close(seed.bandwidth,cfbg.bandwidth);close(seed.bandwidth*300,1000*2*Math.log(2)/Math.PI);
+close(seed.temporal[160].intensity,.5);close(cfbg.temporal[160].x-cfbg.temporal[80].x,150);close(seed.temporal[160].x-seed.temporal[80].x,.3);
+assert(seed.temporal.every(p=>p.phase===0)&&seed.spectral.every(p=>p.phase===0));assert(cfbg.temporal[160].phase<0&&cfbg.spectral[160].phase>0);
+for(let i=0;i<seed.spectral.length;i++)close(seed.spectral[i].intensity,cfbg.spectral[i].intensity);
+console.log('PASS: AOM S-curve and actual voltage; PID convergence, independent gain instability, disturbance, saturation recovery; sampled PD5 motor gradient, reachable targets, slow and unstable hyperparameters; Gaussian time/spectrum intensity and phase.');

@@ -1,0 +1,15 @@
+{
+  "name": "cpa-simulator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive Yb CPA teaching simulator",
+  "scripts": {
+    "test": "node checks/validate-model.cjs && node checks/validate-fields.cjs && node checks/validate-ui.cjs",
+    "render": "node checks/render-diagrams.cjs"
+  },
+  "devDependencies": {
+    "linkedom": "0.18.13",
+    "svg-path-properties": "2.1.0",
+    "sharp": "0.35.4"
+  }
+}
