@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>物理模型说明 · CPA Simulator</title>
+<style>
+:root{color-scheme:dark;--bg:#10262b;--panel:#17343a;--line:#31565d;--text:#e8f4f3;--muted:#a8c0c3;--cyan:#91dde0;--gold:#f4c869;--pink:#ff738f}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#1b3c42 0,transparent 38%),var(--bg);color:var(--text);font:16px/1.72 system-ui,"Microsoft YaHei",sans-serif}main{width:min(1080px,calc(100% - 32px));margin:0 auto;padding:46px 0 72px}a{color:var(--cyan)}.back{display:inline-flex;margin-bottom:24px;text-decoration:none}.eyebrow{letter-spacing:.16em;color:var(--gold);font-size:.78rem}h1{font-size:clamp(2rem,5vw,4.4rem);line-height:1.04;margin:.35rem 0 1rem;max-width:900px}h2{font-size:1.4rem;margin:0 0 .8rem}p{color:var(--muted);max-width:900px}.lead{font-size:1.08rem}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:30px 0}.card{background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);border-radius:16px;padding:22px}.card.wide{grid-column:1/-1}.formula{font-family:Cambria Math,serif;background:#0c2024;border-left:3px solid var(--pink);padding:12px 16px;color:#f2faf9;overflow:auto}table{width:100%;border-collapse:collapse;font-size:.93rem}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--gold)}ul{padding-left:1.25rem;color:var(--muted)}li+li{margin-top:.45rem}.source-list a{word-break:break-word}small{color:var(--muted)}@media(max-width:760px){.grid{grid-template-columns:1fr}.card.wide{grid-column:auto}.table-wrap{overflow-x:auto}}
+</style>
+</head>
+<body><main>
+<a class="back" href="./">← 返回 CPA Simulator</a>
+<div class="eyebrow">MODEL NOTES / 教学模型说明</div>
+<h1>增益、ASE、色散与非线性怎样进入模拟</h1>
+<p class="lead">网站固定每种增益光纤的几何和材料参数，只把实验中常用的泵浦功率与光纤长度交给学习者。输出由同一条复电场链路计算，因此模块读数、压缩优化和时频域曲线保持同步。</p>
+<div class="grid">
+<section class="card wide"><h2>固定光纤参数</h2><div class="table-wrap"><table><thead><tr><th>级别 / 光纤</th><th>泵浦</th><th>长度</th><th>Aeff</th><th>β₂ @ 1030 nm</th><th>γ @ 1030 nm</th><th>976 nm 吸收</th></tr></thead><tbody>
+<tr><td>前置放大 · PM Yb 6/125</td><td>单模，0–1 W</td><td>1–4 m</td><td>≈38.9 μm²</td><td>≈21.65 ps²/km</td><td>≈4.295 W⁻¹km⁻¹</td><td>250 dB/m（纤芯）</td></tr>
+<tr><td>一级预放 · PM Yb 14/125</td><td>包层，0–9 W</td><td>1–4 m</td><td>≈144.0 μm²</td><td>≈18.94 ps²/km</td><td>≈1.160 W⁻¹km⁻¹</td><td>16.6 dB/m（包层）</td></tr>
+<tr><td>二级预放 · PM Yb 20/130</td><td>包层，0–27 W</td><td>1–4 m</td><td>≈201.3 μm²</td><td>≈18.48 ps²/km</td><td>≈0.831 W⁻¹km⁻¹</td><td>10.20 dB/m（包层）</td></tr>
+<tr><td>主放 · aeroGAIN-ROD 3.1</td><td>反向，0–300 W</td><td>固定 0.8 m</td><td>3300 μm²</td><td>≈18.97 ps²/km</td><td>≈0.051 W⁻¹km⁻¹</td><td>总计约 17 dB</td></tr>
+</tbody></table></div><p><small>Aeff、β₂ 与 γ 是教学估算值。β₂ 由熔石英 Sellmeier 材料色散与 LP₀₁ 阶跃波导近似合成；γ=2πn₂/(λAeff)，n₂ 取 2.74×10⁻²⁰ m²/W。商业光纤未公开的完整折射率剖面会使实测值与表中结果有偏差。</small></p></section>
+<section class="card"><h2>稳态增益与泵浦耗尽</h2><p>每一级沿光纤分段求解 Yb³⁺ 二能级稳态反转。局部反转同时受 976 nm 泵浦、1030 nm 信号、前向 ASE 与后向 ASE 影响。</p><div class="formula">N₂/N = Rabs / (Rabs + Rem + 1/τ)</div><p>信号获得的增益会消耗反转，泵浦也随传播耗尽。输入信号越强，增益饱和越明显。</p></section>
+<section class="card"><h2>ASE 不是可调噪声旋钮</h2><p>模拟把频带分成多个谱元，并在每个光纤小段加入自发辐射源项，再传播前、后向 ASE。ASE 由反转粒子数、发射/吸收截面、输入信号和泵浦共同决定。</p><div class="formula">dPASE±/dz = ±[g(λ)PASE± + 2hνΔν·σe(λ)N₂Γ]</div><p>相同泵浦下，较弱的输入信号消耗更少反转，通常留下更强的 ASE；这条规律在自动检查中验证。</p></section>
+<section class="card"><h2>色散与非线性</h2><p>光纤长度决定总群延迟色散，峰值功率沿增益介质增长并累积自相位调制。</p><div class="formula">GDD = β₂L　　B = ∫₀ᴸ γPpeak(z) dz</div><p>因此长度越长，色散与非线性通常越强；在同一光纤中，脉冲峰值功率越高，B 积分越大。棒状光纤的大模场面积显著降低 γ。</p></section>
+<section class="card"><h2>压缩闭环</h2><p>短光栅电机改变压缩距离。模拟从当前复电场计算压缩后脉冲，以 BBO 非线性信号近似峰值强度读数；PD5 强度越高，对应脉冲越窄。</p><div class="formula">J(x) = [τ(x) − τtarget]²　　xₖ₊₁ = xₖ − η·h·∂J/∂x</div><p>梯度由电机位置两侧的 PD5 采样估计。达到容差后控制器仍持续迭代，所以位置、脉宽与输出时频图会继续实时更新。</p></section>
+<section class="card wide source-list"><h2>数据来源</h2><ul>
+<li><a href="https://en.olife.sjtu.edu.cn/public/upload/20251226/15d01010cdcf43ca91daa0179f6c1efb.pdf">上海交通大学 Optics Express CPA 系统论文（PDF）</a>：6/125、14/125、20/130 的系统配置、长度与泵浦吸收数据。</li>
+<li><a href="https://lf.hamamatsu.com/products/optical-fibers-and-modules/aerogain-rod/">Hamamatsu aeroGAIN-ROD 官方规格</a>：3.1 型号的 804±3 mm 长度、3300 μm² 模场面积、976 nm 总吸收、功率和效率规格。</li>
+<li><a href="https://www.coherent.com/resources/datasheet/components-and-accessories/specialty-optical-fibers/lma_ydf_20_130_viii_spec_202011122128.pdf">Coherent PM Yb 20/130 官方数据表（PDF）</a>：20 μm 纤芯、0.08 NA 与 10.20 dB/m 近 976 nm 包层吸收。</li>
+<li><a href="https://opg.optica.org/ao/abstract.cfm?uri=ao-37-3-546">Milam, Applied Optics 37, 546–550 (1998)</a>：1053 nm 熔石英非线性折射率评估值。</li>
+<li><a href="https://opg.optica.org/josa/abstract.cfm?URI=josa-55-10-1205">Malitson, JOSA 55, 1205–1209 (1965)</a>：熔石英 Sellmeier 色散数据。</li>
+</ul></section>
+<section class="card wide"><h2>适用边界</h2><p>这是用于理解参数趋势和闭环控制的教学模型，不是器件选型或安全评估工具。它采用均匀横模、简化 Yb 截面谱、稳态反转和一维传播；未建模横向热效应、模式不稳定、受激拉曼/布里渊散射、损伤阈值、偏振串扰和真实器件公差。进行实验设计时，应使用供应商完整数据、实测种子谱和经过验证的传播软件重新计算。</p></section>
+</div></main></body></html>
