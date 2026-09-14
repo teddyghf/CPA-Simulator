@@ -4,8 +4,9 @@ const close=(a,b,t=1e-8)=>assert(Math.abs(a-b)<t,`${a} differs from ${b}`);
 close(run('aomEfficiency(0)'),0);close(run('aomEfficiency(1)'),.9);close(run('aomEfficiency(.5)'),.45);
 let previous=-1;for(let i=0;i<=100;i++){const e=run(`aomEfficiency(${i/100})`);assert(e>=previous-1e-12&&e>=0&&e<=.9);previous=e;}
 assert(run('aomEfficiency(.51)-aomEfficiency(.49)')>50*run('aomEfficiency(.02)-aomEfficiency(0)'));
-const pid=(gains=[.5,1,.015],seconds=40)=>run(`{const s={target:8,powerLock:true,kp:${gains[0]},ki:${gains[1]},kd:${gains[2]},aomV:0,aomT:0,integral:0,pidPrevious:0,pidDerivative:0,manualVoltage:0};const y=[];for(let i=0;i<${seconds*100};i++){pidAdvance(s,13.3875,.01);if(i>${(seconds-5)*100})y.push(s.aomT*13.3875);}({state:s,power:y.at(-1),span:Math.max(...y)-Math.min(...y)})}`);
+const pid=(gains=[.1,.3,.003],seconds=40,available=13.3875,target=8)=>run(`{const s={target:${target},powerLock:true,kp:${gains[0]},ki:${gains[1]},kd:${gains[2]},aomV:0,aomT:0,integral:0,pidPrevious:0,pidDerivative:0,manualVoltage:0};const y=[];for(let i=0;i<${seconds*100};i++){pidAdvance(s,${available},.01);if(i>${(seconds-5)*100})y.push(s.aomT*${available});}({state:s,power:y.at(-1),span:Math.max(...y)-Math.min(...y)})}`);
 const stable=pid();close(stable.power,8,.001);assert(stable.span<.001);
+const highPower=pid([.1,.3,.003],40,231,20);close(highPower.power,20,.001);assert(highPower.span<.001,'retuned stable gains must remain quiet at high amplifier output');
 assert(pid([.02,.005,0]).power<1,'tiny gains must be visibly slow');
 for(const gains of [[25,1,.015],[.5,60,.015],[.5,1,8]])assert(pid(gains).span>5,'each excessive gain can destabilize the delayed plant');
 run(`var s=${JSON.stringify(stable.state)};var history=[];`);run('for(let i=0;i<3000;i++)pidAdvance(s,13.3875*.8,.01)');close(run('s.aomT*13.3875*.8'),8,.01);
