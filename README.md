@@ -9,7 +9,7 @@
 网页是纯静态实现，无构建步骤：
 
 ```powershell
-python -m http.server 4173 --bind 127.0.0.1 --directory dist
+python -m http.server 4173 --bind 127.0.0.1 --directory docs
 ```
 
 浏览 `http://127.0.0.1:4173/`。
@@ -20,11 +20,12 @@ python -m http.server 4173 --bind 127.0.0.1 --directory dist
 - 前置放大、一级预放和二级预放仅开放泵浦功率与增益光纤长度。主放仅开放 0–300 W 泵浦，aeroGAIN-ROD 3.1 长度固定为 0.8 m。
 - β₂、γ、吸收和模式面积作为光纤固有参数只读。GDD=β₂L；非线性相移 B=∫γPpeak(z)dz。
 - 增益、泵浦耗尽、饱和与双向 ASE 由稳态均匀反转速率方程计算。弱输入会留下更多反转并增强 ASE，长光纤和高峰值功率会增强非线性。
-- AOM1 支持 N=1–100 选脉冲；AOM2 含 0–1 V S 型衍射效率曲线和 PID 功率响应。
+- AOM1 支持 N=1–100 选脉冲；AOM2 含 0–1 V S 型衍射效率曲线和 PID 功率响应。PID 目标上限实时取主放相干信号功率的 90%。
 - 压缩器以 PD5 非线性信号反馈电机。损失、电机位置、PD5、等效脉宽和压缩后复电场同步更新；时域与频域图并排显示。
+- 默认工作点采用 1 ns 展宽、LD2/LD3 各 1 W，使主放关闭时累计非线性相移保持在可压缩范围；高泵浦参数仍用于演示自相位调制和压缩失配。
 - 总览动画沿真实光路循环显示脉冲逐级展宽、增益和压缩，空间信号光与泵浦光使用发光线条。
 
-完整公式、固定参数、厂家规格、参考论文和近似范围见 [`docs/physics-notes.html`](docs/physics-notes.html)。
+完整公式、固定参数、厂家规格、参考论文和近似范围见 [`dist/physics-notes.html`](docs/physics-notes.html)。
 
 ## 参数依据
 

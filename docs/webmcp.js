@@ -2,7 +2,7 @@
 (()=>{
  const context=document.modelContext;if(!context?.registerTool)return;
  const lifecycle=new AbortController();
- const snapshot=()=>({...values(),units:{power:'W',tau:'fs',energy:'μJ',peak:'MW',loss:'1',voltage:'V',motorPosition:'mm',distance:'mm',pd5:'1'},running:state.running,paused:state.paused,parameters:Object.fromEntries(parameterSpecs.map(p=>[p.id,state[p.id]])),outputRateKHz:state.rate,powerLock:state.powerLock,view:state.view,selected:state.selected,pulse:{stage:optical.stage,progress:optical.progress,playing:state.demoPlaying},pid:{time:powerTime,terms:state.pidTerms||null,recent:powerHistory.slice(-5)},gradient:{status:gdStatus,running:state.optimizing,iteration:state.generation,points:gdHistory.length,recent:gdHistory.slice(-3)},teachingModel:true});
+ const snapshot=()=>({...values(),units:{power:'W',tau:'fs',energy:'μJ',peak:'MW',loss:'1',voltage:'V',motorPosition:'mm',distance:'mm',pd5:'1'},running:state.running,paused:state.paused,parameters:Object.fromEntries(parameterSpecs.map(p=>[p.id,state[p.id]])),outputRateKHz:state.rate,powerLock:state.powerLock,view:state.view,selected:state.selected,pulse:{stage:optical.stage,progress:optical.progress,playing:state.demoPlaying},pid:{time:powerTime,targetMax:targetPowerLimit(),terms:state.pidTerms||null,recent:powerHistory.slice(-5)},gradient:{status:gdStatus,running:state.optimizing,iteration:state.generation,points:gdHistory.length,recent:gdHistory.slice(-3)},teachingModel:true});
  const register=tool=>{try{Promise.resolve(context.registerTool(tool,{signal:lifecycle.signal})).catch(e=>console.warn('WebMCP registration unavailable',e.message));}catch(e){console.warn('WebMCP registration unavailable',e.message);}};
  register({name:'read_cpa_simulation',title:'读取 CPA 教学模拟',description:'读取当前教学模块、参数、功率 PID 状态、梯度下降状态与近期曲线数据；不连接真实仪器。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:()=>snapshot()});
  const properties=Object.fromEntries(parameterSpecs.map(p=>[p.id,{type:['pickEvery','maxIterations'].includes(p.id)?'integer':'number',minimum:p.min/(p.scale||1),maximum:p.max/(p.scale||1)}]));properties.running={type:'boolean'};properties.powerLock={type:'boolean'};
@@ -10,7 +10,7 @@
   if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('参数必须为对象');
   for(const[key,value]of Object.entries(input)){const spec=properties[key];if(!spec)throw new Error('未知参数：'+key);if(spec.type==='boolean'){if(typeof value!=='boolean')throw new Error(key+' 必须为布尔值');}else if(typeof value!=='number'||!Number.isFinite(value)||value<spec.minimum||value>spec.maximum||(spec.type==='integer'&&!Number.isInteger(value)))throw new Error(key+' 超出教学范围');}
   if('manualVoltage'in input&&(input.powerLock??state.powerLock))throw new Error('关闭功率闭环后才能手动设置 AOM2');
-  for(const p of parameterSpecs)if(p.id in input)state[p.id]=input[p.id];state.rate=1000/state.pickEvery;
+  for(const p of parameterSpecs)if(p.id in input)state[p.id]=input[p.id];state.rate=1000/state.pickEvery;state.target=Math.min(state.target,targetPowerLimit());
   if('powerLock'in input){state.powerLock=input.powerLock;state.integral=state.aomV-state.kp*(state.target-values().pd4Power)/20;}
   if('powerLock'in input){state.pidPrevious=values().pd4Power/20;state.pidDerivative=0;if(!('manualVoltage'in input))state.manualVoltage=state.aomV;}
   if('running'in input){state.running=input.running;state.paused=false;}
