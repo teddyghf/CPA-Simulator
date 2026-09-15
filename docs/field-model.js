@@ -11,7 +11,7 @@ function gainFactor(p,reference){return 2*p/(p+reference||1);}
 function fieldPipeline(){const key=fieldKey();if(fieldCache.key===key)return fieldCache.stages;fieldCache={key,stages:null,compressed:new Map(),bounds:null};const tau0=state.seedTau/1000,bw=2*Math.log(2)/(Math.PI*tau0),span=2**Math.ceil(Math.log2(Math.max(16,8*bw))),n=2**Math.ceil(Math.log2(span*Math.max(1024,state.stretch*7))),df=span/n,dt=1/span,nu=Float64Array.from({length:n},(_,i)=>(i-n/2)*df),re=Float64Array.from(nu,f=>Math.exp(-2*Math.log(2)*(f/bw)**2)),im=new Float64Array(n),norm=Math.sqrt(.002/sumPower(re,im,df));for(let i=0;i<n;i++)re[i]*=norm;const seed={id:'seed',n,df,dt,nu,re,im,ase:new Float64Array(n),gdd:0,b:0,gain:1};const seedTime=centeredTransform(re,im,-1,df);Object.assign(seed,{tr:seedTime.re,ti:seedTime.im});const gdd=Math.sqrt((state.stretch/tau0)**2-1)*tau0*tau0/(4*Math.log(2)),cfbg={...seed,id:'cfbg',re:re.slice(),im:im.slice(),gdd};rotateField(cfbg.re,cfbg.im,i=>.5*gdd*(2*Math.PI*nu[i])**2);const stretched=centeredTransform(cfbg.re,cfbg.im,-1,df);Object.assign(cfbg,{tr:stretched.re,ti:stretched.im});const stages={seed,cfbg};let input=cfbg;
 
  for(const id of Object.keys(FIBERS)){
-  const fiber=FIBERS[id],repHz=id==='pre1'?1e6:state.rate*1000,coupling=id==='coupler'?.85:1,gate=id==='pre2'?1/state.pickEvery:1;
+  const fiber=FIBERS[id],repHz=id==='pre1'?25e6:state.rate*1000,coupling=id==='coupler'?.85:1,gate=id==='pre2'?1/state.pickEvery:1;
   const inputStats=fieldStats(input),inputBins=(input.amp?.aseBins||ASE_BINS.map(()=>0)).map(p=>p*coupling*gate),amp=solveAmplifier(id,state[fiber.pumpKey],state[fiber.lengthKey],inputStats.energy*repHz/1e6*coupling,inputBins),gain=amp.gain*coupling,gddAdd=amp.beta2*amp.length;
   const r=input.re.slice(),q=input.im.slice(),ase=new Float64Array(n);let shapedEnergy=0;
   for(let i=0;i<n;i++){
@@ -33,9 +33,29 @@ function fieldStats(field){if(field.stats)return field.stats;const n=field.n,dt=
 function compressionMeasurement(position){const f=compressedField(position),stats=fieldStats(f);return{position,distance:80+position,chirp:(position-12)/2,tau:stats.tau,signal:stats.energy>1e-16?state.seedTau/stats.tau:0,fwhm:stats.fwhm};}
 function compressionBounds(){fieldPipeline();if(fieldCache.bounds)return fieldCache.bounds;const points=Array.from({length:41},(_,i)=>compressionMeasurement(i/2));let best=points.reduce((a,b)=>a.tau<b.tau?a:b);for(let x=Math.max(0,best.position-.5);x<=Math.min(20,best.position+.5);x+=.025){const p=compressionMeasurement(x);if(p.tau<best.tau)best=p;}return fieldCache.bounds={min:best.tau,max:Math.max(...points.map(p=>p.tau)),best:best.position};}
 function unwrapCentered(re,im){const n=re.length,out=new Float64Array(n),mid=n>>1;out[mid]=Math.atan2(im[mid],re[mid]);for(const dir of [-1,1])for(let i=mid+dir;i>=0&&i<n;i+=dir){let d=Math.atan2(im[i],re[i])-Math.atan2(im[i-dir],re[i-dir]);d-=2*Math.PI*Math.round(d/(2*Math.PI));out[i]=out[i-dir]+d;}const center=out[mid];for(let i=0;i<n;i++)out[i]-=center;return out;}
-function fieldPlotData(field,timeHalfOverride){if(field.plotData&&!timeHalfOverride)return field.plotData;const stats=fieldStats(field),phaseT=unwrapCentered(field.tr,field.ti),phaseS=unwrapCentered(field.re,field.im),temporal=[],spectral=[],timeHalf=Math.min(field.n*field.dt*.46,timeHalfOverride||Math.max(stats.fwhm/1000*2.4,.4)),background=stats.aseEnergy/(field.aseWindowPs||field.n*field.dt),mid=field.n/2;const spectralPower=Float64Array.from(field.re,(r,i)=>r*r+field.im[i]**2);let specPeak=0;for(const value of spectralPower)specPeak=Math.max(specPeak,value);let specHalf=0;for(let i=0;i<field.n;i++)if(field.re[i]**2+field.im[i]**2+field.ase[i]>specPeak*.0008)specHalf=Math.max(specHalf,Math.abs(field.nu[i]));specHalf=Math.min(field.nu.at(-1)*.9,Math.max(3,specHalf));const maxT=stats.peak+background;
- for(let i=0;i<=400;i++){const t=-timeHalf+2*timeHalf*i/400,at=t/field.dt+mid,coherent=['seed','cfbg'].includes(field.id)?stats.peak*Math.exp(-4*Math.log(2)*(t/(stats.fwhm/1000))**2):interpArray(stats.p,at);temporal.push({x:t,intensity:(coherent+background)/(maxT||1),ase:background/(maxT||1),phase:['seed','cfbg'].includes(field.id)?-2*Math.log(2)*Math.sqrt(Math.max(0,(stats.fwhm/state.seedTau)**2-1))*(t/(stats.fwhm/1000))**2:interpArray(phaseT,at),phaseValid:coherent>stats.peak*.01&&coherent>background*3});const f=-specHalf+2*specHalf*i/400,index=f/field.df+mid,psd=interpArray(spectralPower,index),a=field.amp?asePSDAt(field.amp.aseBins,f)*1e6/field.repHz:interpArray(field.ase,index),lambda=299792.458/(299792.458/1030+f),jac=299792.458/(lambda*lambda);spectral.push({x:lambda,intensity:(psd+a)*jac,ase:a*jac,phase:interpArray(phaseS,index),phaseValid:psd>specPeak*.01&&psd>a*3});}
- spectral.sort((a,b)=>a.x-b.x);const smax=Math.max(...spectral.map(p=>p.intensity));spectral.forEach(p=>{p.intensity/=smax||1;p.ase/=smax||1;});return field.plotData={temporal,spectral,stats,gdd:field.gdd,b:field.b,gain:field.gain,center:1030};}
+function fieldPlotData(field,timeHalfOverride){
+ if(field.plotData&&!timeHalfOverride)return field.plotData;
+ const stats=fieldStats(field),phaseT=unwrapCentered(field.tr,field.ti),phaseS=unwrapCentered(field.re,field.im),temporal=[],spectral=[],background=stats.aseEnergy/(field.aseWindowPs||field.n*field.dt),mid=field.n/2,windowHalf=field.n*field.dt*.46;
+ let timeWeight=0,timeMoment=0;
+ for(let i=0;i<field.n;i++){const p=stats.p[i],t=(i-mid)*field.dt;timeWeight+=p;timeMoment+=p*t;}
+ const timeCenter=timeWeight?timeMoment/timeWeight:0;
+ let dynamicHalf=Math.max(stats.fwhm/1000*2.4,.4);
+ for(let i=0;i<field.n;i++)if(stats.p[i]>stats.peak*1e-5)dynamicHalf=Math.max(dynamicHalf,Math.abs((i-mid)*field.dt-timeCenter)*1.12);
+ const timeHalf=Math.min(windowHalf,timeHalfOverride||dynamicHalf),maxT=stats.peak+background,spectralPower=Float64Array.from(field.re,(r,i)=>r*r+field.im[i]**2),lambdas=new Float64Array(field.n),densities=new Float64Array(field.n);
+ let coherentWeight=0,lambdaMoment=0,densityPeak=0,specPeak=0;
+ for(let i=0;i<field.n;i++){const lambda=299792.458/(299792.458/1030+field.nu[i]),p=spectralPower[i],jac=299792.458/(lambda*lambda),density=(p+field.ase[i])*jac;lambdas[i]=lambda;densities[i]=density;coherentWeight+=p;lambdaMoment+=lambda*p;if(density>densityPeak)densityPeak=density;if(p>specPeak)specPeak=p;}
+ const centerLambda=coherentWeight?lambdaMoment/coherentWeight:1030,threshold=densityPeak*1e-5;let supportMin=centerLambda,supportMax=centerLambda;
+ for(let i=0;i<field.n;i++)if(densities[i]>=threshold){supportMin=Math.min(supportMin,lambdas[i]);supportMax=Math.max(supportMax,lambdas[i]);}
+ const availableMin=Math.min(lambdas[0],lambdas.at(-1)),availableMax=Math.max(lambdas[0],lambdas.at(-1));let lambdaHalf=Math.max(.05,centerLambda-supportMin,supportMax-centerLambda)*1.12;
+ lambdaHalf=Math.min(lambdaHalf,(centerLambda-availableMin)*.995,(availableMax-centerLambda)*.995);if(!Number.isFinite(lambdaHalf)||lambdaHalf<=0)lambdaHalf=.5;
+ for(let i=0;i<=400;i++){
+  const t=-timeHalf+2*timeHalf*i/400,absoluteT=timeCenter+t,at=absoluteT/field.dt+mid,coherent=interpArray(stats.p,at);
+  temporal.push({x:t,intensity:(coherent+background)/(maxT||1),ase:background/(maxT||1),phase:interpArray(phaseT,at),phaseValid:coherent>stats.peak*.01&&coherent>background*3});
+  const lambda=centerLambda-lambdaHalf+2*lambdaHalf*i/400,f=299792.458/lambda-299792.458/1030,index=f/field.df+mid,psd=interpArray(spectralPower,index),a=field.amp?asePSDAt(field.amp.aseBins,f)*1e6/field.repHz:interpArray(field.ase,index),jac=299792.458/(lambda*lambda);
+  spectral.push({x:lambda,intensity:(psd+a)*jac,ase:a*jac,phase:interpArray(phaseS,index),phaseValid:psd>specPeak*.01&&psd>a*3});
+ }
+ const smax=Math.max(...spectral.map(p=>p.intensity));spectral.forEach(p=>{p.intensity/=smax||1;p.ase/=smax||1;});const result={temporal,spectral,stats,gdd:field.gdd,b:field.b,gain:field.gain,center:centerLambda,timeCenter,timeRange:[-timeHalf,timeHalf],spectralRange:[centerLambda-lambdaHalf,centerLambda+lambdaHalf]};if(!timeHalfOverride)field.plotData=result;return result;
+}
 
 function isFieldParameter(id){return ['seedTau','stretch','ld1','ld2','ld3','pump','pickEvery','pre1Length','pre2Length','pre3Length'].includes(id);}
 function compressionLandscape(){fieldPipeline();return fieldCache.curve??=Array.from({length:81},(_,i)=>compressionMeasurement(i/4));}

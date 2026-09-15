@@ -10,7 +10,7 @@
   if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('参数必须为对象');
   for(const[key,value]of Object.entries(input)){const spec=properties[key];if(!spec)throw new Error('未知参数：'+key);if(spec.type==='boolean'){if(typeof value!=='boolean')throw new Error(key+' 必须为布尔值');}else if(typeof value!=='number'||!Number.isFinite(value)||value<spec.minimum||value>spec.maximum||(spec.type==='integer'&&!Number.isInteger(value)))throw new Error(key+' 超出教学范围');}
   if('manualVoltage'in input&&(input.powerLock??state.powerLock))throw new Error('关闭功率闭环后才能手动设置 AOM2');
-  for(const p of parameterSpecs)if(p.id in input)state[p.id]=input[p.id];state.rate=1000/state.pickEvery;state.target=Math.min(state.target,targetPowerLimit());
+  for(const p of parameterSpecs)if(p.id in input)state[p.id]=input[p.id];state.rate=25000/state.pickEvery;state.target=Math.min(state.target,targetPowerLimit());
   if('powerLock'in input){state.powerLock=input.powerLock;state.integral=state.aomV-state.kp*(state.target-values().pd4Power)/20;}
   if('powerLock'in input){state.pidPrevious=values().pd4Power/20;state.pidDerivative=0;if(!('manualVoltage'in input))state.manualVoltage=state.aomV;}
   if('running'in input){state.running=input.running;state.paused=false;}
