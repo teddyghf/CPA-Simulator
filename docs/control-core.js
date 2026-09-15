@@ -16,7 +16,7 @@ function pidAdvance(s,available,dt){
  const delayed=s.voltageQueue.shift();s.aomV=clamp(s.aomV+(delayed-s.aomV)*(1-Math.exp(-dt/.12)),0,1);
  s.aomT=aomEfficiency(s.aomV);return available*s.aomT;
 }
-const MOTOR={min:0,max:20,optimum:12,mmPerChirp:2,baseDistance:80};
+const MOTOR={min:0,max:50,optimum:12,mmPerChirp:2,baseDistance:80};
 function compressorSample(position,tau0){const chirp=(position-MOTOR.optimum)/MOTOR.mmPerChirp,tau=tau0*Math.sqrt(1+chirp**2);return{position,distance:MOTOR.baseDistance+position,chirp,tau,signal:tau0/tau};}
 function signalLoss(signal,targetSignal){return (1/Math.max(signal,1e-9)-1/targetSignal)**2;}
 // The controller knows only sampled PD5 signals and a target calibration, never the plant optimum.

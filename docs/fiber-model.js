@@ -9,6 +9,7 @@ const FIBERS=Object.freeze({
 });
 const AMP_DEFAULTS=FIBERS;
 const YB=Object.freeze({h:6.62607015e-34,c:299792458,lambda:1030e-9,pumpLambda:976e-9,n2:2.74e-20,lifetime:.001,pumpAbs:2.5e-24,pumpEm:2.5e-24,signalAbs:.07e-24,signalEm:.6e-24});
+const PUMP_TO_OPTICAL_EFFICIENCY=.5;
 // Smooth reference cross-section curves, not a measured spectrum for a commercial batch.
 function ybCrossSections(lambdaNm){const offset=lambdaNm-1030;return{a:YB.signalAbs*Math.exp(-offset/18),e:YB.signalEm*Math.exp(-4*Math.log(2)*(offset/45)**2)};}
 const ASE_BINS=Array.from({length:80},(_,i)=>{const wavelength=1000+(i+.5)*1.25,cross=ybCrossSections(wavelength),frequency=YB.c/(wavelength*1e-9),bandwidth=YB.c*1.25e-9/(wavelength*1e-9)**2;return{wavelength,frequency,bandwidth,...cross};});
@@ -28,7 +29,12 @@ function solveAmplifier(id,pumpW,length,signalInW,aseIn=[]){
   return{inversion,pumpW:pump,pumpOut,absorbedPump:pump-pumpOut,signalIn:signal,signalOut,aseW,backwardW,aseBins:bins,gain,logGain,residual,decayPhotons,...f};
  };
  let lo=0,hi=.5;for(let i=0;i<60;i++){const mid=(lo+hi)/2;if(evaluate(mid).residual>0)lo=mid;else hi=mid;}
- return evaluate((lo+hi)/2);
+ const raw=evaluate((lo+hi)/2),aseInputW=aseIn.reduce((sum,p)=>sum+Math.max(0,p||0),0),signalAdded=Math.max(0,raw.signalOut-signal),forwardAseAdded=Math.max(0,raw.aseW-aseInputW),opticalAdded=signalAdded+forwardAseAdded+raw.backwardW,budget=PUMP_TO_OPTICAL_EFFICIENCY*Math.max(0,raw.absorbedPump),energyScale=opticalAdded>budget&&opticalAdded>0?budget/opticalAdded:1;
+ // The rate equation sets inversion and spectral shape. This engineering budget represents
+ // quantum defect, splice/combiner loss and unmodelled relaxation, and prevents optical
+ // power created in the stage from exceeding 50% of absorbed pump power.
+ const aseBins=raw.aseBins.map((p,i)=>{const input=Math.max(0,aseIn[i]||0);return p>=input?input+(p-input)*energyScale:p;}),aseW=aseBins.reduce((sum,p)=>sum+p,0),signalOut=raw.signalOut>=signal?signal+(raw.signalOut-signal)*energyScale:raw.signalOut,backwardW=raw.backwardW*energyScale,gain=signal>0?signalOut/signal:raw.gain,logGain=Math.log(Math.max(gain,1e-300)),convertedPower=Math.max(0,signalOut-signal)+Math.max(0,aseW-aseInputW)+backwardW,conversionEfficiency=raw.absorbedPump>0?convertedPower/raw.absorbedPump:0;
+ return{...raw,signalOut,aseW,backwardW,aseBins,gain,logGain,aseInputW,convertedPower,conversionEfficiency,pumpToOpticalEfficiency:PUMP_TO_OPTICAL_EFFICIENCY,energyLimited:energyScale<1,energyScale};
 }
 function asePSDAt(bins,frequencyOffsetTHz){const wavelength=299792.458/(299792.458/1030+frequencyOffsetTHz),at=(wavelength-1000)/1.25-.5,i=Math.floor(at),fraction=at-i;if(i<0||i>=ASE_BINS.length-1)return 0;return ((bins[i]||0)/ASE_BINS[i].bandwidth*(1-fraction)+(bins[i+1]||0)/ASE_BINS[i+1].bandwidth*fraction)*1e12;}
 function nonlinearIntegral(gamma,length,inputPeakW,gain){return gamma*length*inputPeakW*expIntegral(Math.log(Math.max(gain,1e-300)));}

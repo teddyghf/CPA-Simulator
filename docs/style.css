@@ -32,3 +32,5 @@
 .fiber-readout{margin:18px 0;padding:16px;background:#132c31;border:1px solid #35545b;border-radius:8px}.fiber-readout h3{font-size:16px;margin:0 0 10px}.fiber-readout p,.fiber-readout a{font-size:13px;line-height:1.8;color:#a9c6ce}.fiber-readout dl{display:grid;grid-template-columns:1fr auto;gap:10px;font-size:13px}.fiber-readout dd{margin:0;color:#c8efdd}.field-snapshot{font-size:13px;color:#b3cfda;line-height:1.7;margin:0 0 14px}
 
 .overview-compressor text{display:none}.overview-compressor-labels text{font-family:"Microsoft YaHei",sans-serif}.overview-compressor-labels .control-line{stroke-dasharray:5 4}
+
+.inline-math,.display-math{font-family:"Cambria Math","STIX Two Math","Times New Roman",serif;color:#e7f5f1}.inline-math{display:inline-block;font-size:1.08em;margin:0 .12em;vertical-align:-.12em}.display-math{display:block;font-size:1.25em;margin:auto}.inline-math mtext,.display-math mtext{font-family:inherit}
